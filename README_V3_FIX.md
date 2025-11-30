@@ -1,4 +1,4 @@
-# SillyTavern-Chub-Search v3 Fix (2025)
+# SillyTavern-Chub-Search v4 Fix (2025)
 
 ## O que foi corrigido?
 
@@ -8,7 +8,7 @@ Esta versão corrige o problema da extensão que parou de funcionar devido às m
 
 A API do Chub.ai (`api.chub.ai`) está protegida por Cloudflare e bloqueia requisições diretas que não vêm de um navegador autenticado. Isso causa erro 403 (Forbidden) em todas as tentativas de busca e download.
 
-### Solução Implementada
+### Solução Implementada (v4)
 
 **Mudanças principais:**
 
@@ -62,7 +62,7 @@ rm -rf SillyTavern-Chub-Search  # Remove a versão antiga
 - Adicionou fallback para avatars (mas como segunda opção)
 - Quebrou novamente quando Cloudflare foi implementado (Setembro 2025)
 
-### v3 (Esta versão - Novembro 2025)
+### v4 (Esta versão - Novembro 2025)
 - Endpoint SillyTavern: `/api/content/importUUID` (mantido)
 - **Prioriza** o endpoint de avatars (primeira opção)
 - Tratamento de erros robusto
@@ -99,8 +99,8 @@ Se a extensão ainda não funcionar:
 
 ## Changelog
 
-### v1.0.2 (Novembro 2025) - v3 Fix
-- Prioriza endpoint de avatars que não está bloqueado
+### v1.0.3 (Novembro 2025) - v4 Fix
+- Prioriza endpoint de avatars que não está bloqueado\n- **Corrige erro 422** na API de busca, convertendo booleanos para 0/1 na URL
 - Adiciona tratamento robusto de erros
 - Melhora mensagens de erro para o usuário
 - Adiciona logging detalhado

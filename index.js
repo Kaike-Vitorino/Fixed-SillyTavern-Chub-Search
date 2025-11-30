@@ -144,12 +144,20 @@ async function fetchCharactersBySearch({ searchTerm, includeTags, excludeTags, n
     nsfw = nsfw || extension_settings.chub.nsfw;  // Default to extension settings if not provided
     let require_images = false;
     let require_custom_prompt = false;
+
+    // Convert booleans to 0 or 1 for API compatibility (Fixes 422 error)
+    const asc_val = asc ? 1 : 0;
+    const include_forks_val = include_forks ? 1 : 0;
+    const nsfw_val = nsfw ? 1 : 0;
+    const require_images_val = require_images ? 1 : 0;
+    const require_custom_prompt_val = require_custom_prompt ? 1 : 0;
     searchTerm = searchTerm ? `search=${encodeURIComponent(searchTerm)}&` : '';
     sort = sort || 'download_count';
 
     // Construct the URL with the search parameters, if any
     // 
-    let url = `${API_ENDPOINT_SEARCH}?${searchTerm}first=${first}&page=${page}&sort=${sort}&asc=${asc}&venus=true&include_forks=${include_forks}&nsfw=${nsfw}&require_images=${require_images}&require_custom_prompt=${require_custom_prompt}`;
+    // Use 1/0 for boolean parameters
+    let url = `${API_ENDPOINT_SEARCH}?${searchTerm}first=${first}&page=${page}&sort=${sort}&asc=${asc_val}&venus=1&include_forks=${include_forks_val}&nsfw=${nsfw_val}&require_images=${require_images_val}&require_custom_prompt=${require_custom_prompt_val}`;
 
     //truncate include and exclude tags to 100 characters
     includeTags = includeTags.filter(tag => tag.length > 0);

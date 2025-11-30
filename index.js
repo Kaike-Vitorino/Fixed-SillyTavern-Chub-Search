@@ -166,29 +166,61 @@ async function fetchCharactersBySearch({ searchTerm, includeTags, excludeTags, n
         url += `&exclude_tags=${encodeURIComponent(excludeTags)}`;
     }
 
-    let searchResponse = await fetch(url);
-
-    let searchData = await searchResponse.json();
+    let searchResponse;
+    let searchData;
+    
+    try {
+        searchResponse = await fetch(url);
+        
+        if (!searchResponse.ok) {
+            console.error(`Search API returned ${searchResponse.status}: ${searchResponse.statusText}`);
+            toastr.error(`Chub API returned error ${searchResponse.status}. The API may be blocked by Cloudflare. Try accessing chub.ai directly.`, 'Search Failed', {timeOut: 5000});
+            return [];
+        }
+        
+        searchData = await searchResponse.json();
+    } catch (error) {
+        console.error('Failed to fetch search results:', error);
+        toastr.error('Failed to connect to Chub API. The service may be blocked or unavailable. Try accessing chub.ai directly.', 'Search Failed', {timeOut: 5000});
+        return [];
+    }
 
     // Clear previous search results
     chubCharacters = [];
 
-    if (searchData.nodes.length === 0) {
+    if (!searchData || !searchData.nodes || searchData.nodes.length === 0) {
+        console.log('No characters found in search results');
         return chubCharacters;
     }
-    let charactersPromises = searchData.nodes.map(node => getCharacter(node.fullPath));
+    // Fetch character images with error handling
+    let charactersPromises = searchData.nodes.map(node => 
+        getCharacter(node.fullPath).catch(error => {
+            console.warn(`Failed to fetch character ${node.fullPath}:`, error);
+            return null; // Return null for failed fetches
+        })
+    );
     let characterBlobs = await Promise.all(charactersPromises);
 
     characterBlobs.forEach((character, i) => {
-        let imageUrl = URL.createObjectURL(character);
-        chubCharacters.push({
-            url: imageUrl,
-            description: searchData.nodes[i].tagline || "Description here...",
-            name: searchData.nodes[i].name,
-            fullPath: searchData.nodes[i].fullPath,
-            tags: searchData.nodes[i].topics,
-            author: searchData.nodes[i].fullPath.split('/')[0],
-        });
+        if (character === null) {
+            // Skip characters that failed to load
+            console.log(`Skipping character ${searchData.nodes[i].fullPath} due to fetch error`);
+            return;
+        }
+        
+        try {
+            let imageUrl = URL.createObjectURL(character);
+            chubCharacters.push({
+                url: imageUrl,
+                description: searchData.nodes[i].tagline || "Description here...",
+                name: searchData.nodes[i].name,
+                fullPath: searchData.nodes[i].fullPath,
+                tags: searchData.nodes[i].topics,
+                author: searchData.nodes[i].fullPath.split('/')[0],
+            });
+        } catch (error) {
+            console.error(`Error creating object URL for ${searchData.nodes[i].fullPath}:`, error);
+        }
     });
 
     return chubCharacters;
@@ -507,36 +539,59 @@ async function displayCharactersInListViewPopup() {
  * @returns {Promise<Blob>} - Resolves with a Blob of the fetched character data.
  */
 async function getCharacter(fullPath) {
-    let response = await fetch(
-        API_ENDPOINT_DOWNLOAD,
-        {
-            method: "POST",
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                fullPath: fullPath,
-                format: "tavern",
-                version: "main"
-            }),
-        }
-    );
-
-    // If the request failed, try a backup endpoint - https://avatars.charhub.io/{fullPath}/avatar.webp
-    if (!response.ok) {
-        console.log(`Request failed for ${fullPath}, trying backup endpoint`);
-        response = await fetch(
+    // Try the backup endpoint first (avatars.charhub.io) as the main API is often blocked by Cloudflare
+    console.log(`Fetching character: ${fullPath}`);
+    
+    try {
+        // First attempt: Use the reliable avatar endpoint
+        let response = await fetch(
             `https://avatars.charhub.io/avatars/${fullPath}/avatar.webp`,
             {
                 method: "GET",
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Accept': 'image/webp,image/*'
                 },
             }
         );
+        
+        if (response.ok) {
+            console.log(`Successfully fetched from avatars endpoint: ${fullPath}`);
+            let data = await response.blob();
+            return data;
+        }
+    } catch (error) {
+        console.warn(`Avatar endpoint failed for ${fullPath}:`, error);
     }
-    let data = await response.blob();
-    return data;
+    
+    // Second attempt: Try the official API (may be blocked by Cloudflare)
+    try {
+        let response = await fetch(
+            API_ENDPOINT_DOWNLOAD,
+            {
+                method: "POST",
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    fullPath: fullPath,
+                    format: "tavern",
+                    version: "main"
+                }),
+            }
+        );
+        
+        if (response.ok) {
+            console.log(`Successfully fetched from API endpoint: ${fullPath}`);
+            let data = await response.blob();
+            return data;
+        }
+    } catch (error) {
+        console.error(`API endpoint failed for ${fullPath}:`, error);
+    }
+    
+    // If both failed, return a placeholder or throw error
+    console.error(`Failed to fetch character: ${fullPath}`);
+    throw new Error(`Unable to fetch character: ${fullPath}`);
 }
 
 /**
